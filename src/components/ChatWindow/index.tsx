@@ -1,13 +1,12 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/store';
 import { fetchMessages } from '../../store/slices/chatSlice';
 import { toggleContactInfo } from '../../store/slices/uiSlice';
-import { emitTypingStart, emitTypingStop, emitMessageRead, getSocket } from '../../services/socket';
+import { emitTypingStart, emitTypingStop, emitMessageRead, getSocket} from '../../services/socket';
 import api from '../../services/api';
-import { Avatar, EmojiPicker, ContextMenu, ContextMenuItem, MessageTicks } from '../Common';
+import { Avatar, EmojiPicker, ContextMenu, type ContextMenuItem, MessageTicks } from '../Common';
 import { VideoIcon, PhoneIcon, SearchIcon, MoreIcon, EmojiIcon, AttachIcon, SendIcon, MicIcon, CloseIcon } from '../Common/Icons';
-import { Message, User } from '../../types';
+import { type Message, type User } from '../../types';
 
 // ─── ChatWindow ───────────────────────────────────────────────────────────────
 const ChatWindow: React.FC = () => {

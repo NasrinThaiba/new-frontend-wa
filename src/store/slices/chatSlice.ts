@@ -1,6 +1,6 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import api from '../../services/api';
-import { ChatState, Conversation, Message } from '../../types';
+import { type ChatState, type Conversation, type Message } from '../../types';
 
 // ─── Thunks ────────────────────────────────────────────────────────────────
 export const fetchConversations = createAsyncThunk(
