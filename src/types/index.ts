@@ -6,9 +6,10 @@ export interface User {
   email: string;
   avatar?: string;
   status: string;
-  phone?: string;
+  phone: string;
   isOnline: boolean;
   lastSeen?: string;
+  blockedUsers?: string[];
 }
 
 export interface Message {
@@ -16,8 +17,6 @@ export interface Message {
   conversation: string;
   sender: User | string;
   text?: string;
-  mediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'audio' | 'document';
   status: MessageStatus;
   reactions: Array<{ userId: string; emoji: string }>;
   replyTo?: Message;
@@ -36,6 +35,7 @@ export interface Conversation {
   unreadCount?: number;
   createdAt: string;
   updatedAt: string;
+  hasUnread? : boolean;
 }
 
 export interface AuthState {
@@ -44,6 +44,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  allUsers: User[];
 }
 
 export interface ChatState {
@@ -60,6 +61,7 @@ export interface UIState {
   showContactInfo: boolean;
   showNewChat: boolean;
   showSettings: boolean;
+  showCreateGroup: boolean;
 }
 
 // Socket event types
@@ -83,4 +85,21 @@ export interface MessageStatusEvent {
 export interface MessageReadEvent {
   conversationId: string;
   readBy: string;
+}
+
+export interface UserState {
+  blockedUsers: any[];
+  loading: boolean;
+}
+
+export interface AddParticipantsModalProps {
+  onClose: () => void;
+  groupId: string;
+  participants: User[] ;
+}
+
+export interface IconProps {
+  className?: string;
+  size?: number | string;
+  color?: string;
 }

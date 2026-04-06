@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { store } from '../store/store';
 
 let socket: Socket | null = null;
 
@@ -16,6 +17,16 @@ export const initSocket = (token: string): Socket => {
   socket.removeAllListeners();
 
   socket.on('connect', () => console.log('✅ Socket connected:', socket?.id));
+
+  const state = store.getState();
+    const conversations = state.chat.conversations;
+
+    conversations.forEach((conv: any) => {
+      socket?.emit('conversation:join', conv._id);
+    });
+
+    console.log('✅ Rejoined all conversations');
+
   socket.on('disconnect', (reason) => console.log('❌ Socket disconnected:', reason));
   socket.on('connect_error', (err) => console.error('Socket error:', err.message));
 

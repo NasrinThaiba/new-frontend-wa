@@ -22,12 +22,12 @@ export const LoginPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { isLoading, error, isAuthenticated } = useAppSelector((s) => s.auth);
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ phone: '', password: '' });
 
   useEffect(() => { if (isAuthenticated) navigate('/'); }, [isAuthenticated, navigate]);
   useEffect(() => { dispatch(clearError()); }, [dispatch]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     dispatch(loginUser(form));
   };
@@ -37,8 +37,8 @@ export const LoginPage: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-        <Input label="Email" type="email" value={form.email} placeholder="you@example.com"
-          onChange={(e) => setForm((form) => ({ ...form, email: e.target.value }))} required />
+        <Input label="Mobile Number" type="tel" value={form.phone} placeholder="1234567890"
+          onChange={(e) => setForm((form) => ({ ...form, phone: e.target.value }))} required />
 
         <Input label="Password" type="password" value={form.password} placeholder="••••••••"
           onChange={(e) => setForm((form) => ({ ...form, password: e.target.value }))} required />
@@ -70,7 +70,7 @@ export const RegisterPage: React.FC = () => {
   useEffect(() => { if (isAuthenticated) navigate('/'); }, [isAuthenticated, navigate]);
   useEffect(() => { dispatch(clearError()); }, [dispatch]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault(); //avoid page reload
     dispatch(registerUser(form));
   };
@@ -108,12 +108,10 @@ export const RegisterPage: React.FC = () => {
 };
 
 //  Shared layout - layout for register and login page
-const AuthLayout: React.FC<{ title: string; subtitle: string; children: React.ReactNode }> = ({
-  title, subtitle, children,
-}) => (
+const AuthLayout: React.FC<{ title: string; subtitle: string; children: React.ReactNode }> = ({ title, subtitle, children}) => (
   <div className="min-h-screen bg-[#111b21] flex items-center justify-center p-4">
     <div className="w-full max-w-sm">
-      {/* Logo */}
+      
       <div className="flex flex-col items-center mb-8 gap-3">
         <div className="w-16 h-16 rounded-full bg-[#00a884] flex items-center justify-center shadow-lg shadow-[#00a884]/30">
           <svg viewBox="0 0 24 24" fill="white" className="w-9 h-9">
@@ -126,7 +124,7 @@ const AuthLayout: React.FC<{ title: string; subtitle: string; children: React.Re
         </div>
       </div>
 
-      {/* Card */}
+     
       <div className="bg-[#202c33] rounded-2xl p-6 shadow-2xl">
         {children}
       </div>

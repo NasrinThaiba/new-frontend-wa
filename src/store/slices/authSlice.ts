@@ -2,10 +2,10 @@ import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/tool
 import api from '../../services/api';
 import { type AuthState, type User } from '../../types';
 
-// ─── Thunks - used for API call
+//  Thunks - used for API call
 export const registerUser = createAsyncThunk(
   'auth/register',
-  async (data: { name: string; email: string; password: string; phone?: string }, { rejectWithValue }) => {
+  async (data: { name: string; email: string; password: string; phone: string }, { rejectWithValue }) => {
     try {
       const res = await api.post('/auth/register', data);
       localStorage.setItem('token', res.data.token);
@@ -18,7 +18,7 @@ export const registerUser = createAsyncThunk(
 
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (data: { email: string; password: string }, { rejectWithValue }) => {
+  async (data: { phone: string; password: string }, { rejectWithValue }) => {
     try {
       const res = await api.post('/auth/login', data);
       localStorage.setItem('token', res.data.token);
@@ -48,13 +48,14 @@ export const logoutUser = createAsyncThunk('auth/logout', async (_, { rejectWith
   }
 });
 
-// ─── Slice ─────────────────────────────────────────────────────────────────
+//  Slice 
 const initialState: AuthState = {
   user: null,
   token: localStorage.getItem('token'),
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  allUsers: []
 };
 
 const authSlice = createSlice({

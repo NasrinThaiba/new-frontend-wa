@@ -1,29 +1,55 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/store';
-import { fetchMessages } from '../../store/slices/chatSlice';
+import { fetchMessages, removeUserFromGroup } from '../../store/slices/chatSlice';
 import { toggleContactInfo } from '../../store/slices/uiSlice';
 import { emitTypingStart, emitTypingStop, emitMessageRead, getSocket} from '../../services/socket';
 import api from '../../services/api';
 import { Avatar, EmojiPicker, ContextMenu, type ContextMenuItem, MessageTicks } from '../Common';
 import { VideoIcon, PhoneIcon, SearchIcon, MoreIcon, EmojiIcon, AttachIcon, SendIcon, MicIcon, CloseIcon } from '../Common/Icons';
 import { type Message, type User } from '../../types';
+import { blockUser, unblockUser, fetchBlockedUsers } from '../../store/slices/userSlice';
+import AddParticipantsModal from "../../components/Sidebar/AddParticipantsModal"
 
-// ─── ChatWindow ───────────────────────────────────────────────────────────────
+
+//  ChatWindow 
 const ChatWindow: React.FC = () => {
   const { activeConversationId, conversations } = useAppSelector((s) => s.chat);
   const { showContactInfo } = useAppSelector((s) => s.ui);
   const { user } = useAppSelector((s) => s.auth);
-  //const dispatch = useAppDispatch();
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    dispatch(fetchBlockedUsers()); 
+  }, [dispatch]);
 
   if (!activeConversationId) return <EmptyState />;
-
+  
   const conversation = conversations.find((c) => c._id === activeConversationId);
   if (!conversation) return <EmptyState />;
 
-  const otherParticipant = conversation.participants.find((p) => p._id !== user?._id);
-  const displayUser: User = conversation.isGroup
-    ? { _id: conversation._id, name: conversation.groupName ?? 'Group', phone: '', email: "", status: '', isOnline: false, avatar: conversation.groupAvatar }
-    : (otherParticipant ?? { _id: '', name: 'Unknown', phone: '',email: "", status: '', isOnline: false, avatar: ""});
+ const otherParticipant = conversation.participants?.find(
+  (p: User) => p._id !== user?._id
+);
+
+const displayUser: User = conversation.isGroup
+  ? {
+      _id: conversation._id,
+      name: conversation.groupName ?? 'Group',
+      phone: '',
+      email: "",
+      status: '',
+      isOnline: false,
+      avatar: conversation.groupAvatar
+    }
+  : {
+      _id: otherParticipant?._id || 'unknown',
+      name: otherParticipant?.name || 'Unknown',
+      phone: otherParticipant?.phone || '',
+      email: otherParticipant?.email || "",
+      status: otherParticipant?.status || '',
+      isOnline: otherParticipant?.isOnline || false,
+      avatar: otherParticipant?.avatar || ""
+    };
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -37,7 +63,9 @@ const ChatWindow: React.FC = () => {
   );
 };
 
-// ─── ChatHeader ───────────────────────────────────────────────────────────────
+
+
+//  ChatHeader 
 const ChatHeader: React.FC<{ displayUser: User; conversationId: string; isGroup: boolean }> = ({
   displayUser, conversationId, isGroup,
 }) => {
@@ -53,15 +81,15 @@ const ChatHeader: React.FC<{ displayUser: User; conversationId: string; isGroup:
     : 'offline';
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 bg-[#202c33] border-b border-[#2a3942] flex-shrink-0">
-      <button className="flex items-center gap-3 text-left" onClick={() => dispatch(toggleContactInfo())}>
+    <div className="flex items-center justify-between px-4 py-3 bg-[#202c33] border-b border-[#2a3942] flex-shrink-0 gap-3">
+      <button className="flex items-center gap-3 text-left min-w-0 flex-1" onClick={() => dispatch(toggleContactInfo())}>
         <Avatar user={displayUser} showOnline={!isGroup} />
-        <div>
-          <h3 className="text-[#e9edef] text-sm font-medium">{displayUser.name}</h3>
-          <p className={`text-xs ${typingNames.length > 0 ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>{subtitle}</p>
+        <div className="space-y-1">
+          <h3 className="text-[#e9edef] text-sm font-medium truncate">{displayUser.name}</h3>
+          <p className={`text-xs truncate  ${typingNames.length > 0 ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>{subtitle}</p>
         </div>
       </button>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-shrink-0">
         {[{ icon: <VideoIcon />, label: 'Video' }, { icon: <PhoneIcon />, label: 'Call' }, { icon: <SearchIcon />, label: 'Search' }, { icon: <MoreIcon />, label: 'More' }].map((b) => (
           <button key={b.label} title={b.label} className="p-2 text-[#aebac1] hover:text-white rounded-full transition-colors">{b.icon}</button>
         ))}
@@ -70,7 +98,7 @@ const ChatHeader: React.FC<{ displayUser: User; conversationId: string; isGroup:
   );
 };
 
-// ─── MessageList ──────────────────────────────────────────────────────────────
+//  MessageList 
 const MessageList: React.FC<{ conversationId: string; currentUserId?: string }> = ({
   conversationId, currentUserId,
 }) => {
@@ -79,6 +107,13 @@ const MessageList: React.FC<{ conversationId: string; currentUserId?: string }> 
   const typingUsers = useAppSelector((s) => s.chat.typingUsers[conversationId] ?? {});
   const isLoading = useAppSelector((s) => s.chat.isLoadingMessages);
   const endRef = useRef<HTMLDivElement>(null);
+  const { conversations } = useAppSelector(s => s.chat);
+  const { user } = useAppSelector(s => s.auth);
+  const blockedUsers = useAppSelector(s => s.blockedUsers.blockedUsers);
+
+  const conversation = conversations.find(c => c._id === conversationId);
+  const otherUserId = conversation?.participants.find((p : User) => p._id !== user?._id)?._id;
+  const isBlocked = (blockedUsers || []).some(u => u._id === otherUserId);
 
   useEffect(() => {
     dispatch(fetchMessages({ conversationId }));
@@ -94,6 +129,14 @@ const MessageList: React.FC<{ conversationId: string; currentUserId?: string }> 
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
         </svg>
+      </div>
+    );
+  }
+
+  if (isBlocked) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-[#8696a0]">
+        You blocked this user. Messages are hidden.
       </div>
     );
   }
@@ -118,22 +161,13 @@ const MessageList: React.FC<{ conversationId: string; currentUserId?: string }> 
           />
         ))}
 
-        {Object.keys(typingUsers).length > 0 && (
-          <div className="flex justify-start mb-2">
-            <div className="bg-[#202c33] px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="w-2 h-2 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-              ))}
-            </div>
-          </div>
-        )}
         <div ref={endRef} />
       </div>
     </div>
   );
 };
 
-// ─── MessageBubble ────────────────────────────────────────────────────────────
+//  MessageBubble 
 const MessageBubble: React.FC<{ message: Message; isMe: boolean; conversationId: string }> = ({
   message, isMe, conversationId,
 }) => {
@@ -142,13 +176,11 @@ const MessageBubble: React.FC<{ message: Message; isMe: boolean; conversationId:
   const handleDelete = async (deleteFor: 'me' | 'everyone') => {
     try {
       await api.delete(`/messages/${message._id}`, { data: { deleteFor } });
-      getSocket()?.emit('message:deleted', { messageId: message._id, conversationId });
+      getSocket()?.emit('message:delete', { messageId: message._id, conversationId });
     } catch (err) { console.error('Delete failed', err); }
   };
 
   const menuItems: ContextMenuItem[] = [
-    // { label: 'Reply', action: () => {} },
-    // { label: 'Star message', action: () => {} },
     ...(isMe ? [{ label: 'Delete for everyone', action: () => handleDelete('everyone'), danger: true }] : []),
     { label: 'Delete for me', action: () => handleDelete('me'), danger: true },
   ];
@@ -159,10 +191,7 @@ const MessageBubble: React.FC<{ message: Message; isMe: boolean; conversationId:
   return (
     <>
       <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1 group`}>
-
         <div className={`relative max-w-xs lg:max-w-md xl:max-w-lg ${isMe ? 'order-2' : 'order-1'}`}> 
-          {/* avartar message */}
-
           <div onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
             className={`px-3 py-2 rounded-2xl shadow-md cursor-pointer select-text transition-all hover:brightness-110
               ${isMe ? 'bg-[#005c4b] rounded-tr-sm' : 'bg-[#202c33] rounded-tl-sm'}`}>
@@ -179,11 +208,6 @@ const MessageBubble: React.FC<{ message: Message; isMe: boolean; conversationId:
             </div>
             </div>
 
-          {/* {message.reactions?.length > 0 && (
-            <div className={`absolute -bottom-2 ${isMe ? 'right-2' : 'left-2'} bg-[#2a3942] rounded-full px-1.5 py-0.5 text-xs shadow flex gap-0.5`}>
-              {message.reactions.slice(0, 3).map((r, i) => <span key={i}>{r.emoji}</span>)}
-            </div>
-          )} */}
           <button onClick={(e) => { e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }); }}
             className={`absolute top-1 ${isMe ? 'left-1' : 'right-1'} opacity-0 group-hover:opacity-100 transition-opacity
               bg-[#182229] rounded-full p-0.5 text-[#8696a0] hover:text-white`}>
@@ -196,23 +220,35 @@ const MessageBubble: React.FC<{ message: Message; isMe: boolean; conversationId:
   );
 };
 
-// ─── ChatInput ────────────────────────────────────────────────────────────────
+//  ChatInput 
 const ChatInput: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { conversations } = useAppSelector(s => s.chat);
+  const { user } = useAppSelector(s => s.auth);
+  const blockedUsers = useAppSelector(s => s.blockedUsers.blockedUsers);
+
+  const conversation = conversations.find(c => c._id === conversationId);
+  const otherUserId = conversation?.participants.find(p => p._id !== user?._id)?._id;
+  const isBlocked = (blockedUsers || []).some(u => u._id === otherUserId);
 
   const handleSend = async () => {
+    if (isBlocked) return; // 🚫 block send
     const trimmed = text.trim();
     if (!trimmed) return;
+
     try {
       getSocket()?.emit('message:send', { conversationId, text: trimmed });
       setText('');
       setShowEmoji(false);
       emitTypingStop(conversationId);
+
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    } catch (err) { console.error('Send failed', err); }
+    } catch (err) {
+      console.error('Send failed', err);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -225,72 +261,201 @@ const ChatInput: React.FC<{ conversationId: string }> = ({ conversationId }) => 
     ta.style.height = 'auto';
     ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`;
     emitTypingStart(conversationId);
-    // if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    // typingTimerRef.current = setTimeout(() => emitTypingStop(conversationId), 2000);
   };
 
-  return (
-    <div className="bg-[#202c33] px-4 py-3 relative flex-shrink-0">
-      {showEmoji && <EmojiPicker onSelect={(e) => setText((t) => t + e)} onClose={() => setShowEmoji(false)} />}
-      <div className="flex items-end gap-2">
-        <button onClick={() => setShowEmoji(v => !v)} className={`p-1 flex-shrink-0 mb-1 transition-colors ${showEmoji ? 'text-[#00a884]' : 'text-[#8696a0] hover:text-[#e9edef]'}`}>
-          <EmojiIcon />
-        </button>
-        <button className="p-1 flex-shrink-0 mb-1 text-[#8696a0] hover:text-[#e9edef] transition-colors"><AttachIcon /></button>
-        <div className="flex-1 bg-[#2a3942] rounded-2xl px-4 py-2 min-h-[42px] flex items-center">
-          <textarea ref={textareaRef} value={text} onChange={handleChange} onKeyDown={handleKeyDown}
-            placeholder="Type a message" rows={1}
-            className="w-full bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] resize-none outline-none leading-5 max-h-32 overflow-y-auto" />
-        </div>
-        <button onClick={handleSend}
-          className={`flex-shrink-0 mb-1 p-2.5 rounded-full transition-all ${text.trim() ? 'bg-[#00a884] text-white hover:bg-[#06cf9c]' : 'text-[#8696a0] hover:text-[#e9edef]'}`}>
-          {text.trim() ? <SendIcon /> : <MicIcon />}
-        </button>
+return (
+  <div className="bg-[#202c33] px-4 py-3 relative flex-shrink-0">
+    
+    {isBlocked && (
+      <div className="text-center text-red-400 text-sm mb-2">
+        You blocked this user. Unblock to send messages.
       </div>
+    )}
+
+    {showEmoji && (
+      <EmojiPicker onSelect={(e) => setText((t) => t + e)}  onClose={() => setShowEmoji(false)}/>
+    )}
+    <div className="flex items-end gap-2">
+
+      <button onClick={() => setShowEmoji(v => !v)} disabled={isBlocked} className={`p-1 mb-1 ${ isBlocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
+        <EmojiIcon className="w-5 h-5 text-[#e9edef]" />
+      </button>
+
+      <button disabled={isBlocked} className={`p-1 mb-1 ${ isBlocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
+        <AttachIcon className="w-5 h-5 text-[#e9edef]" />
+      </button>
+
+      <div className="flex-1 bg-[#2a3942] rounded-2xl px-4 py-2">
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          disabled={isBlocked}   
+          placeholder="Type a message"
+          rows={1}
+          className="w-full bg-transparent text-[#e9edef] text-sm outline-none resize-none"
+        />
+      </div>
+
+    
+      <button
+        onClick={handleSend} disabled={isBlocked || !text.trim()}  
+        className={`p-2.5 rounded-full transition-all ${isBlocked ? 'bg-gray-500 cursor-not-allowed' : text.trim() ? 'bg-[#00a884] hover:bg-[#06cf9c]' : 'text-[#8696a0]'} text-white`}
+      >
+        {text.trim() ? <SendIcon /> : <MicIcon />}
+      </button>
+
     </div>
-  );
+  </div>
+);
 };
 
-// ─── ContactInfoPanel ─────────────────────────────────────────────────────────
-const ContactInfoPanel: React.FC<{ user: User; isGroup: boolean; conversation: any }> = ({
-  user, isGroup, conversation,
-}) => {
+//  ContactInfoPanel 
+const ContactInfoPanel: React.FC<{ user: User; isGroup: boolean; conversation: any }> = ({ user, isGroup, conversation}) => {
   const dispatch = useAppDispatch();
+
+  const blockedUsers = useAppSelector(s => s.blockedUsers.blockedUsers);
+  const currentUserId = useAppSelector(s => s.auth.user?._id);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const isBlocked = (blockedUsers || []).some(u => u._id === user._id);
+  const isAdmin = conversation.groupAdmin === currentUserId;
+
+  const handleBlock = () => {
+    dispatch(blockUser(user._id));
+  };
+
+  const handleUnblock = () => {
+    dispatch(unblockUser(user._id));
+  };
+
+  const handleToggle = () => {
+    if (isBlocked) handleUnblock();
+    else handleBlock();
+  };
+
+  const handleRemoveFromGroup = (participantId: string) => {
+    console.log("REMOVE:", {
+      groupId: conversation._id,
+      userId: participantId,
+    });
+
+    dispatch(removeUserFromGroup({
+      groupId: conversation._id,
+      userId: participantId,
+    }));
+  };
+
+
   return (
     <div className="w-80 bg-[#111b21] border-l border-[#2a3942] flex flex-col overflow-hidden flex-shrink-0">
+    
       <div className="flex items-center gap-4 px-4 py-4 bg-[#202c33]">
-        <button onClick={() => dispatch(toggleContactInfo())} className="text-[#aebac1] hover:text-white transition-colors">
+        <button
+          onClick={() => dispatch(toggleContactInfo())}
+          className="text-[#aebac1] hover:text-white transition-colors"
+        >
           <CloseIcon />
         </button>
-        <h3 className="text-[#e9edef] font-medium">{isGroup ? 'Group info' : 'Contact info'}</h3>
+        <h3 className="text-[#e9edef] font-medium">
+          {isGroup ? 'Group info' : 'Contact info'}
+        </h3>
       </div>
+
       <div className="flex-1 overflow-y-auto">
         <div className="bg-[#111b21] flex flex-col items-center py-8 gap-3">
           <Avatar user={user} size="xl" showOnline={!isGroup} />
           <div className="text-center">
             <h2 className="text-[#e9edef] text-xl font-medium">{user.name}</h2>
             <p className="text-[#8696a0] text-sm mt-1">
-              {isGroup ? `${conversation.participants?.length} members` : user.isOnline ? 'online' : 'offline'}
+              {isGroup
+                ? `${conversation.participants?.length || 0} members`
+                : user.isOnline
+                ? 'online'
+                : 'offline'}
             </p>
           </div>
         </div>
+
+        
         <div className="bg-[#202c33] p-4 mb-2">
           <p className="text-[#00a884] text-sm font-medium mb-1">About</p>
-          <p className="text-[#e9edef] text-sm">{user.status || 'Hey there! I am using WhatsApp.'}</p>
+          <p className="text-[#e9edef] text-sm">
+            {user.status || 'Hey there! I am using WhatsApp.'}
+          </p>
         </div>
+
         {!isGroup && (
           <div className="bg-[#202c33] p-4 mb-2">
-            <button className="w-full text-left text-red-400 text-sm hover:text-red-300 transition-colors">
-              Block {user.name}
+            <button
+              onClick={handleToggle}
+              className="w-full text-left text-red-400 text-sm hover:text-red-300 transition-colors"
+            >
+              {isBlocked ? `Unblock ${user.name}` : `Block ${user.name}`}
             </button>
           </div>
         )}
+
+        {isGroup && (
+          <div className="bg-[#202c33] p-4 mb-2 flex flex-col gap-2">
+            <p className="text-[#00a884] text-sm font-medium mb-2">
+              Participants
+            </p>
+            
+            {isAdmin && (
+               <button
+               onClick={() => setShowAddModal(true)}
+               className="bg-[#00a884] px-3 py-2 my-2 text-xs rounded text-white">
+                 Add Participants
+                 </button>
+                )}
+
+            {conversation.participants?.map((participant: User) => {
+              if (!participant?._id) return null;
+              const isSelf = participant._id === currentUserId;
+
+              return (
+                <div
+                  key={participant._id}
+                  className="flex items-center justify-between bg-[#111b21] px-3 py-2 rounded"
+                >
+                  <div className="flex items-center gap-2">
+                    <Avatar user={participant} size="sm" />
+                    <span className="text-[#e9edef] text-sm">
+                      {participant.name}
+                      {isSelf && " (You)"}
+                    </span>
+                  </div>
+
+                  
+                  {(isAdmin || isSelf) && (
+                    <button
+                      onClick={() => handleRemoveFromGroup(participant._id)}
+                      className="text-red-400 text-xs hover:text-red-300 transition-colors"
+                    >
+                      {isSelf ? "Leave" : "Remove"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
+            <AddParticipantsModal
+            onClose={() => setShowAddModal(false)}
+            groupId={conversation._id}
+            participants={conversation.participants || []} 
+            />
+            </div>
+          )}
       </div>
     </div>
   );
 };
 
-// ─── EmptyState ────────────────────────────────────────────────────────────────
+//  EmptyState 
 const EmptyState: React.FC = () => (
   <div className="flex-1 flex flex-col items-center justify-center bg-[#222e35] select-none">
     <div className="flex flex-col items-center gap-6 max-w-sm text-center px-8">

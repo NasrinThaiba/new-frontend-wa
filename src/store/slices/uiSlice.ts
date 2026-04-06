@@ -5,6 +5,7 @@ const initialState: UIState = {
   showContactInfo: false,
   showNewChat: false,
   showSettings: false,
+  showCreateGroup: false,
 };
 
 const uiSlice = createSlice({
@@ -17,8 +18,10 @@ const uiSlice = createSlice({
     closeNewChat: (state) => { state.showNewChat = false; },
     toggleSettings: (state) => { state.showSettings = !state.showSettings; },
     closeSettings: (state) => { state.showSettings = false; },
+    toggleCreateGroup: (s) => { s.showCreateGroup = !s.showCreateGroup; },
   },
 });
 
-export const { toggleContactInfo, closeContactInfo, toggleNewChat, closeNewChat, toggleSettings, closeSettings } = uiSlice.actions;
+export const { toggleContactInfo, closeContactInfo, toggleNewChat, closeNewChat, toggleSettings, closeSettings,toggleCreateGroup } = uiSlice.actions;
+
 export default uiSlice.reducer;

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { type User } from '../../types';
+import { type User, type MessageStatus } from '../../types';
 import { CheckIcon, DblCheckIcon } from './Icons';
 
-// ─── Avatar ────────────────────────────────────────────────────────────────
+//  Avatar 
 type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 const szMap: Record<AvatarSize, string> = { sm: 'w-8 h-8', md: 'w-10 h-10', lg: 'w-14 h-14', xl: 'w-16 h-16' };
 const dotMap: Record<AvatarSize, string> = { sm: 'w-2 h-2 bottom-0 right-0', md: 'w-2.5 h-2.5 bottom-0 right-0', lg: 'w-3 h-3 bottom-0.5 right-0.5', xl: 'w-3.5 h-3.5 bottom-0.5 right-0.5' };
@@ -21,7 +21,7 @@ export const Avatar: React.FC<{ user?: User | null; size?: AvatarSize; showOnlin
   </div>
 );
 
-// ─── ContextMenu ────────────────────────────────────────────────────────────
+//  ContextMenu 
 export interface ContextMenuItem { label: string; action: () => void; danger?: boolean }
 
 export const ContextMenu: React.FC<{ x: number; y: number; items: ContextMenuItem[]; onClose: () => void }> = ({
@@ -53,7 +53,7 @@ export const ContextMenu: React.FC<{ x: number; y: number; items: ContextMenuIte
   );
 };
 
-// ─── EmojiPicker ────────────────────────────────────────────────────────────
+//  EmojiPicker 
 const EMOJIS = ['😀','😂','🥰','😍','🤩','😎','🥳','😭','😱','🤔','👍','👎','❤️','🔥','🎉','🚀','💯','✅','🙏','👋','😄','🤣','😊','😇','🥺','😴','🤯','🥴','🤗','😅','💪','🎵','🍕','☕','🌟','💡','📱','💻','🎮','🏆'];
 
 export const EmojiPicker: React.FC<{ onSelect: (e: string) => void; onClose: () => void }> = ({
@@ -69,18 +69,10 @@ export const EmojiPicker: React.FC<{ onSelect: (e: string) => void; onClose: () 
   </div>
 );
 
-// ─── MessageTicks ────────────────────────────────────────────────────────────
-export const MessageTicks: React.FC<{ status: string }> = ({ status }) => {
+//  MessageTicks 
+export const MessageTicks: React.FC<{ status: MessageStatus }> = ({ status }) => {
   if (status === 'sent') return <CheckIcon />;
   if (status === 'delivered') return <DblCheckIcon blue={false} />;
   if (status === 'read') return <DblCheckIcon blue={true} />;
   return null;
 };
-
-// ─── Spinner ─────────────────────────────────────────────────────────────────
-export const Spinner: React.FC<{ size?: string }> = ({ size = 'w-6 h-6' }) => (
-  <svg className={`animate-spin ${size} text-[#00a884]`} fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-  </svg>
-);

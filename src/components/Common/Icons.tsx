@@ -1,11 +1,5 @@
 import React from 'react';
-
-// 🔹 Common Props
-export interface IconProps {
-  className?: string;
-  size?: number | string;
-  color?: string;
-}
+import { type IconProps } from '../../types';
 
 // 🔹 Icon Factory (Reusable)
 const createIcon = ( d: string, { viewBox = '0 0 24 24', defaultClass = 'w-5 h-5' } = {}): React.FC<IconProps> => {

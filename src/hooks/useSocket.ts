@@ -1,28 +1,29 @@
 import { useEffect } from 'react';
 import { initSocket, disconnectSocket } from '../services/socket';
 import { useAppDispatch, useAppSelector } from '../store/store';
-import {
-  addMessage,
-  updateConversation,
-  setTyping,
+import { addMessage, updateConversation, setTyping,
   updateMessageStatus,
   updateUserOnlineInConversations,
 } from '../store/slices/chatSlice';
 import { updateUserOnlineStatus } from '../store/slices/authSlice';
-import { type Message, type Conversation, type TypingEvent, type UserOnlineEvent, type MessageReadEvent } from '../types';
+import { type Message, type Conversation, type TypingEvent, type UserOnlineEvent } from '../types';
 
 export const useSocket = (): void => {
   const dispatch = useAppDispatch();
-  const { token, isAuthenticated, user } = useAppSelector((s) => s.auth);
+  const { token, isAuthenticated } = useAppSelector((s) => s.auth);
+  const conversations = useAppSelector((s) => s.chat.conversations);
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;
 
     const socket = initSocket(token);
 
+    conversations.forEach((conv) => { socket.emit('conversation:join', conv._id)});
+
     // Handlers
     const handleMessage = (message: Message) => {
       dispatch(addMessage(message));
+      dispatch( updateConversation({ _id: message.conversation, hasUnread: true }));
     };
 
     const handleConversationUpdate = (conversation: Conversation) => {
@@ -37,10 +38,8 @@ export const useSocket = (): void => {
       dispatch(setTyping({ ...event, userName: '', isTyping: false }));
     };
 
-    const handleMessageRead = (event: MessageReadEvent) => {
-      if (user) {
-        dispatch(updateMessageStatus({ ...event, currentUserId: user._id }));
-      }
+    const handleMessageStatusUpdate = (event: any) => {
+      dispatch(updateMessageStatus(event));
     };
 
     const handleUserOnline = (event: UserOnlineEvent) => {
@@ -53,8 +52,8 @@ export const useSocket = (): void => {
     socket.on('conversation:updated', handleConversationUpdate);
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
-    socket.on('message:read', handleMessageRead);
     socket.on('user:online', handleUserOnline);
+    socket.on('message:status:update', handleMessageStatusUpdate);
 
     // Cleanup
     return () => {
@@ -62,8 +61,8 @@ export const useSocket = (): void => {
       socket.off('conversation:updated', handleConversationUpdate);
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
-      socket.off('message:read', handleMessageRead);
       socket.off('user:online', handleUserOnline);
+      socket.off('message:status:update', handleMessageStatusUpdate);
     };
 
   }, [isAuthenticated, token]); // removed user & dispatch

@@ -42,6 +42,7 @@ const ChatLayout: React.FC = () => {
     <div className="flex h-screen bg-[#111b21] overflow-hidden">
       <Sidebar />
       <ChatWindow />
+      
     </div>
   );
 };

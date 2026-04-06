@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/tool
 import api from '../../services/api';
 import { type ChatState, type Conversation, type Message } from '../../types';
 
-// ─── Thunks ────────────────────────────────────────────────────────────────
+//  Thunks 
 export const fetchConversations = createAsyncThunk(
   'chat/fetchConversations',
   async (_, { rejectWithValue }) => {
@@ -41,17 +41,44 @@ export const createConversation = createAsyncThunk(
 
 export const createGroup = createAsyncThunk(
   "chat/createGroup",
-  async ({ name, participants }: { name: string; participants: string[] }) => {
-    const res = await api.post("/conversations/group", {
+  async ({ name, participants }: { name: string; participants: string[] }, {rejectWithValue}) => {
+    try {
+         const res = await api.post("/conversations/group", {
       name,
       participants
     });
-
-    return res.data;
+    return res.data.conversation;
+    }catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Failed to create group");
+    }
   }
 );
 
-// ─── Slice ─────────────────────────────────────────────────────────────────
+export const addUserToGroup = createAsyncThunk(
+  'chat/addUserToGroup',
+  async ({ groupId, userId }: { groupId: string; userId: string }, thunkAPI) => {
+    try {
+      const res = await api.put(`/groups/${groupId}/add`, { userId });
+      return res.data.conversation; // updated group
+    } catch (err: any) {
+      return thunkAPI.rejectWithValue(err.response.data);
+    }
+  }
+);
+
+export const removeUserFromGroup = createAsyncThunk(
+  'chat/removeUserFromGroup',
+  async ({ groupId, userId }: { groupId: string; userId: string }, thunkAPI) => {
+    try {
+      const res = await api.put(`/groups/${groupId}/remove`, { userId });
+      return res.data.conversation; // updated group
+    } catch (err: any) {
+      return thunkAPI.rejectWithValue(err.response.data);
+    }
+  }
+);
+
+//  Slice 
 const initialState: ChatState = {
   conversations: [],
   activeConversationId: null,
@@ -66,12 +93,15 @@ const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
+
     setActiveConversation(state, action: PayloadAction<string | null>) {
       state.activeConversationId = action.payload;
     },
+
     setSearchQuery(state, action: PayloadAction<string>) {
       state.searchQuery = action.payload;
     },
+
     // Called when Socket.io emits a new message
     addMessage(state, action: PayloadAction<Message>) {
       const msg = action.payload;
@@ -86,18 +116,18 @@ const chatSlice = createSlice({
       const conv = state.conversations.find((c) => c._id === convId);
       if (conv) conv.lastMessage = msg;
     },
-    updateConversation(state, action: PayloadAction<Conversation>) {
-      const idx = state.conversations.findIndex((c) => c._id === action.payload._id);
-      if (idx > -1) { //index[0, 1, 2, ...]
-        state.conversations[idx] = action.payload; // exists -> update
-      } else {
-        state.conversations.unshift(action.payload); //not exists -> add
-      }
-      // Re-sort by updatedAt
-      state.conversations.sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    
+    
+    updateConversation( state, action: PayloadAction<Partial<Conversation> & { _id: string }>) {
+      const index = state.conversations.findIndex(
+        (c) => c._id === action.payload._id
       );
+      
+      if (index !== -1) {
+        state.conversations[index] = {...state.conversations[index], ...action.payload};
+      }
     },
+
     setTyping(state, action: PayloadAction<{ conversationId: string; userId: string; userName: string; isTyping: boolean }>) {
       const { conversationId, userId, userName, isTyping } = action.payload;
       //if no typingusers create empty object
@@ -109,16 +139,19 @@ const chatSlice = createSlice({
         delete state.typingUsers[conversationId][userId]; //delete the username
       }
     },
-    updateMessageStatus(state, action: PayloadAction<{ conversationId: string; readBy: string; currentUserId: string }>) {
-      const { conversationId, currentUserId } = action.payload;
-      const messages = state.messages[conversationId];
-      if (messages) {
-        messages.forEach((msg) => {
-          const senderId = typeof msg.sender === 'string' ? msg.sender : (msg.sender as any)._id;
-          if (senderId === currentUserId) msg.status = 'read';
-        });
+    
+    updateMessageStatus( state, action: PayloadAction<{ messageId: string; status: 'sent' | 'delivered' | 'read'}>) {
+      const { messageId, status } = action.payload;
+      
+      for (const convId in state.messages) {
+        const msg = state.messages[convId].find(m => m._id === messageId);
+        if (msg) {
+          msg.status = status;
+          break; 
+        }
       }
     },
+
     removeMessage(state, action: PayloadAction<{ conversationId: string; messageId: string }>) {
       const { conversationId, messageId } = action.payload;
       if (state.messages[conversationId]) {
@@ -127,6 +160,7 @@ const chatSlice = createSlice({
         );
       }
     },
+
     updateUserOnlineInConversations(state, action: PayloadAction<{ userId: string; isOnline: boolean; lastSeen?: string }>) {
       state.conversations.forEach((conv) => {
         conv.participants.forEach((p) => {
@@ -137,7 +171,17 @@ const chatSlice = createSlice({
         });
       });
     },
+
+    deleteConversation(state, action: PayloadAction<string>) {
+      state.conversations = state.conversations.filter(
+        (conv) => conv._id !== action.payload
+      );
+      if (state.activeConversationId === action.payload) {
+        state.activeConversationId = null;
+      }
+    },
   },
+
   extraReducers: (builder) => {
     builder.addCase(fetchConversations.pending, (state) => { state.isLoadingConversations = true; });
     builder.addCase(fetchConversations.fulfilled, (state, action) => {
@@ -158,6 +202,19 @@ const chatSlice = createSlice({
       if (!exists) state.conversations.unshift(action.payload);
       state.activeConversationId = action.payload._id;
     });
+    builder.addCase(createGroup.fulfilled, (state, action) => {
+      state.conversations.unshift(action.payload); // add new group on top
+    });
+     builder.addCase(removeUserFromGroup.fulfilled, (state, action) => {
+      const updatedGroup = action.payload;
+      const index = state.conversations.findIndex(c => c._id === updatedGroup._id);
+      if (index !== -1) state.conversations[index] = updatedGroup;
+    });
+    builder.addCase(addUserToGroup.fulfilled, (state, action) => {
+      const updatedGroup = action.payload;
+      const index = state.conversations.findIndex(c => c._id === updatedGroup._id );
+      if (index !== -1) {state.conversations[index] = updatedGroup}
+    });      
   },
 });
 
@@ -170,5 +227,7 @@ export const {
   updateMessageStatus,
   removeMessage,
   updateUserOnlineInConversations,
+  deleteConversation,
 } = chatSlice.actions;
+
 export default chatSlice.reducer;
