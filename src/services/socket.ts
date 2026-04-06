@@ -6,7 +6,7 @@ let socket: Socket | null = null;
 export const initSocket = (token: string): Socket => {
   if (socket?.connected) return socket;
 
-  socket = io('http://localhost:5000', {
+  socket = io('https://rough-backend-wa-1.onrender.com', {
     auth: { token },
     transports: ['websocket', 'polling'], //Transports = methods used to communicate between client and server, websocket is first, if not supported, fallback to polling
     reconnection: true,
